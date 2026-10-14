@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CIP Decision Dashboards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root{
+    --paper:#F0EFE5;
+    --card:#FFFFFF;
+    --ink:#181F16;
+    --ink-soft:#68705F;
+    --ink-faint:#96998A;
+    --line:#E1DECF;
+    --line-strong:#C7C4AE;
+    --deep:#122822;
+    --gold:#B4842A;
+    --accept:#166856; --accept-bg:#E3EEE8; --accept-line:#B7D6C8;
+    --hold:#946515;   --hold-bg:#F5ECD8;   --hold-line:#E3CE9E;
+    --decline:#9A3628; --decline-bg:#F5E1DB; --decline-line:#E4B8AC;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse 900px 500px at 50% -10%, rgba(180,132,42,0.06), transparent),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    padding:0 0 6rem;
+  }
+  .wrap{max-width:980px;margin:0 auto;padding:0 1.75rem;}
+
+  .hero{padding:3.25rem 0 2rem;}
+  .mark{
+    width:34px;height:34px;border-radius:50%;
+    border:1.5px solid var(--deep);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Fraunces',serif;font-weight:600;font-size:14px;color:var(--deep);
+    margin-bottom:18px;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:0.12em;
+    text-transform:uppercase;color:var(--ink-faint);margin:0 0 10px;
+  }
+  h1{
+    font-family:'Fraunces',serif;font-weight:600;font-size:clamp(30px,4vw,42px);
+    letter-spacing:-0.015em;line-height:1.08;margin:0 0 14px;color:var(--deep);
+  }
+  .hero p{color:var(--ink-soft);font-size:15px;line-height:1.6;max-width:480px;margin:0;}
+  .rule{height:1px;background:linear-gradient(90deg,var(--gold),var(--line-strong) 40%,transparent);margin-top:2rem;}
+
+  .tabs{display:flex;gap:2px;margin:2rem 0 1.75rem;}
+  .tab{
+    font-family:'IBM Plex Mono',monospace;font-size:12.5px;letter-spacing:0.03em;
+    padding:11px 18px;cursor:pointer;color:var(--ink-soft);background:transparent;
+    border:1px solid var(--line-strong);border-radius:5px;transition:all .15s;
+  }
+  .tab:hover{border-color:var(--deep);color:var(--deep);}
+  .tab.active{background:var(--deep);color:#EFEDE1;border-color:var(--deep);}
+  .panel{display:none;}
+  .panel.active{display:block;animation:fadein .25s ease;}
+  @keyframes fadein{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+  .dropzone{
+    border:1.5px dashed var(--line-strong);border-radius:10px;background:var(--card);
+    padding:34px 20px;text-align:center;cursor:pointer;transition:border-color .15s, background .15s;
+  }
+  .dropzone:hover, .dropzone.drag{border-color:var(--gold);background:#FEFCF6;}
+  .dz-icon{
+    width:40px;height:40px;margin:0 auto 12px;border-radius:50%;background:var(--paper);
+    display:flex;align-items:center;justify-content:center;color:var(--ink-faint);
+  }
+  .dropzone .label{font-size:14.5px;font-weight:500;margin-bottom:4px;color:var(--ink);}
+  .dropzone .sub{font-size:12.5px;color:var(--ink-faint);}
+  .dropzone input{display:none;}
+
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:2rem 0;}
+  .kpi{
+    background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:16px 18px;border-left:3px solid var(--line-strong);
+  }
+  .kpi.k-buy{border-left-color:var(--accept);}
+  .kpi.k-hold{border-left-color:var(--hold);}
+  .kpi.k-avoid{border-left-color:var(--decline);}
+  .kpi.k-tension{border-left-color:var(--deep);}
+  .kpi .n{font-family:'Fraunces',serif;font-size:30px;font-weight:600;line-height:1;color:var(--deep);}
+  .kpi .l{font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-faint);margin-top:8px;}
+
+  .stamp{
+    display:inline-flex;align-items:center;gap:5px;
+    font-family:'Fraunces',serif;font-weight:600;font-size:11.5px;letter-spacing:0.02em;
+    padding:5px 12px 5px 10px;border-radius:3px;
+    border:1.5px solid currentColor;position:relative;transform:rotate(-1.5deg);
+    box-shadow:0 1px 0 rgba(0,0,0,0.03);
+  }
+  .stamp::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;}
+  .stamp.accept{color:var(--accept);background:var(--accept-bg);}
+  .stamp.hold{color:var(--hold);background:var(--hold-bg);}
+  .stamp.decline{color:var(--decline);background:var(--decline-bg);}
+
+  .chart-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 22px;margin:1.75rem 0;}
+  .chart-card .ct{
+    font-family:'IBM Plex Mono',monospace;font-size:11.5px;text-transform:uppercase;
+    letter-spacing:0.06em;color:var(--ink-faint);margin:0 0 14px;
+  }
+
+  .table-card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:0.5rem;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{
+    text-align:left;font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;
+    letter-spacing:0.05em;color:var(--ink-faint);font-weight:500;padding:12px 14px;
+    background:var(--paper);border-bottom:1px solid var(--line-strong);
+  }
+  td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:#FAFAF4;}
+  .mono{font-family:'IBM Plex Mono',monospace;font-size:12.5px;}
+  .just{color:var(--ink-soft);font-size:12.5px;line-height:1.5;max-width:280px;}
+  .tension-flag{color:var(--decline);font-weight:600;font-family:'IBM Plex Mono',monospace;font-size:12px;}
+  .co-name{font-weight:500;}
+
+  .case-card{
+    background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:22px 24px;margin-bottom:18px;
+  }
+  .case-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;gap:16px;}
+  .case-id{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--ink-faint);margin-bottom:8px;}
+  .risk-score{font-family:'Fraunces',serif;font-size:26px;font-weight:600;color:var(--deep);text-align:right;}
+  .risk-label{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--ink-faint);text-align:right;margin-top:2px;}
+
+  .fraud-banner{
+    background:var(--decline-bg);color:var(--decline);border:1px solid var(--decline-line);
+    border-radius:6px;padding:10px 14px;font-size:12.5px;line-height:1.5;margin-bottom:16px;
+  }
+  .fraud-banner b{font-weight:600;}
+
+  .agent-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;}
+  .agent-block{border:1px solid var(--line);border-radius:7px;padding:12px 14px;background:var(--paper);}
+  .agent-block .at{
+    font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;
+    letter-spacing:0.05em;color:var(--ink-faint);margin:0 0 8px;font-weight:500;
+  }
+  .agent-block .av{font-size:12px;line-height:1.6;}
+  .kv-row{display:flex;justify-content:space-between;gap:10px;margin-bottom:2px;}
+  .kv-row span:first-child{color:var(--ink-soft);}
+  .kv-row span:last-child{font-family:'IBM Plex Mono',monospace;text-align:right;}
+
+  .justification{
+    font-size:13.5px;line-height:1.6;color:var(--ink);margin-top:16px;padding-top:16px;
+    border-top:1px solid var(--line);font-family:'Fraunces',serif;font-weight:500;font-size:14px;
+  }
+
+  .empty-hint{font-size:13px;color:var(--ink-faint);margin-top:1rem;text-align:center;}
+
+  @media (max-width:640px){
+    .kpi-row{grid-template-columns:repeat(2,1fr);}
+    .agent-grid{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div class="mark">CIP</div>
+    <p class="eyebrow">HDFC Life · Corporate Internship Programme</p>
+    <h1>Decision dashboards</h1>
+    <p>Drop in the output files from either AI pipeline to review generated verdicts, scores, and cross-agent reasoning in one place.</p>
+    <div class="rule"></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="fata">Equity research — FA+TA</button>
+    <button class="tab" data-tab="uw">Underwriting co-pilot</button>
+  </div>
+
+  <div class="panel active" id="panel-fata">
+    <div class="dropzone" id="drop-fata">
+      <input type="file" id="file-fata" accept=".xlsx">
+      <div class="dz-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3M12 3v12M7 8l5-5 5 5"/></svg>
+      </div>
+      <div class="label">Drop FA_TA_Decision_Output.xlsx here, or click to browse</div>
+      <div class="sub">Reads recommendation, fundamental score, and technical signal columns</div>
+    </div>
+    <div id="fata-results"></div>
+  </div>
+
+  <div class="panel" id="panel-uw">
+    <div class="dropzone" id="drop-uw">
+      <input type="file" id="file-uw" accept=".json">
+      <div class="dz-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3M12 3v12M7 8l5-5 5 5"/></svg>
+      </div>
+      <div class="label">Drop underwriting_copilot_results.json here, or click to browse</div>
+      <div class="sub">Reads all five agent outputs for each case</div>
+    </div>
+    <div id="uw-results"></div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.tab').forEach(function(tab){
+  tab.addEventListener('click', function(){
+    document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+    document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+function setupDropzone(zoneId, inputId, onFile){
+  var zone = document.getElementById(zoneId);
+  var input = document.getElementById(inputId);
+  zone.addEventListener('click', function(){ input.click(); });
+  input.addEventListener('change', function(e){
+    if(e.target.files.length) onFile(e.target.files[0]);
+  });
+  zone.addEventListener('dragover', function(e){ e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', function(){ zone.classList.remove('drag'); });
+  zone.addEventListener('drop', function(e){
+    e.preventDefault();
+    zone.classList.remove('drag');
+    if(e.dataTransfer.files.length) onFile(e.dataTransfer.files[0]);
+  });
+}
+
+function stampClass(rec){
+  if(!rec) return 'hold';
+  var r = rec.toLowerCase();
+  if(r.indexOf('buy') > -1 || r.indexOf('accept standard') > -1) return 'accept';
+  if(r.indexOf('avoid') > -1 || r.indexOf('decline') > -1) return 'decline';
+  return 'hold';
+}
+
+setupDropzone('drop-fata', 'file-fata', function(file){
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var data = new Uint8Array(e.target.result);
+    var wb = XLSX.read(data, {type:'array'});
+    var ws = wb.Sheets[wb.SheetNames[0]];
+    var rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+    renderFATA(rows);
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+function renderFATA(rows){
+  var el = document.getElementById('fata-results');
+  if(!rows.length){ el.innerHTML = '<p class="empty-hint">No rows found in that file.</p>'; return; }
+
+  var buy=0, hold=0, avoid=0, tension=0;
+  rows.forEach(function(r){
+    var rec = (r.recommendation || '').toLowerCase();
+    if(rec === 'buy') buy++; else if(rec === 'avoid') avoid++; else hold++;
+    if(r.signal_tension === true || r.signal_tension === 'true' || r.signal_tension === 'TRUE') tension++;
+  });
+
+  var html = '';
+  html += '<div class="kpi-row">'
+    + '<div class="kpi k-buy"><div class="n">' + buy + '</div><div class="l">Buy</div></div>'
+    + '<div class="kpi k-hold"><div class="n">' + hold + '</div><div class="l">Hold</div></div>'
+    + '<div class="kpi k-avoid"><div class="n">' + avoid + '</div><div class="l">Avoid</div></div>'
+    + '<div class="kpi k-tension"><div class="n">' + tension + '</div><div class="l">Signal tension</div></div>'
+    + '</div>';
+
+  html += '<div class="chart-card"><div class="ct">Fundamental score by company</div>'
+    + '<div style="position:relative;height:' + Math.max(rows.length*38+50, 200) + 'px;">'
+    + '<canvas id="fataChart" role="img" aria-label="Bar chart of fundamental scores by company"></canvas></div></div>';
+
+  html += '<div class="table-card"><table><thead><tr><th>Company</th><th>Recommendation</th><th>Fund. score</th><th>Technical</th><th>Tension</th><th>Justification</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    var rec = r.recommendation || '-';
+    var sc = stampClass(rec);
+    var score = r.fundamental_score_calculated !== undefined ? r.fundamental_score_calculated : (r.fundamental_score || '-');
+    var tensionFlag = (r.signal_tension === true || r.signal_tension === 'true' || r.signal_tension === 'TRUE');
+    html += '<tr>'
+      + '<td class="co-name">' + (r.company || '-') + '</td>'
+      + '<td><span class="stamp ' + sc + '">' + rec + '</span></td>'
+      + '<td class="mono">' + score + '</td>'
+      + '<td class="mono">' + (r.technical_signal || '-') + '</td>'
+      + '<td>' + (tensionFlag ? '<span class="tension-flag">Yes</span>' : '<span class="mono" style="color:var(--ink-faint);">No</span>') + '</td>'
+      + '<td class="just">' + (r.justification || '') + '</td>'
+      + '</tr>';
+  });
+  html += '</tbody></table></div>';
+
+  el.innerHTML = html;
+
+  var labels = rows.map(function(r){ return r.company || '-'; });
+  var scores = rows.map(function(r){
+    var v = r.fundamental_score_calculated !== undefined ? r.fundamental_score_calculated : r.fundamental_score;
+    return typeof v === 'number' ? v : 0;
+  });
+  var colors = rows.map(function(r){
+    var sc = stampClass(r.recommendation);
+    return sc === 'accept' ? '#166856' : (sc === 'decline' ? '#9A3628' : '#946515');
+  });
+
+  new Chart(document.getElementById('fataChart'), {
+    type: 'bar',
+    data: { labels: labels, datasets: [{ label:'Fundamental score', data: scores, backgroundColor: colors, borderRadius: 4, maxBarThickness: 24 }] },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { min:0, max:100, grid:{ color:'#EAE8DA' }, ticks:{ color:'#96998A', font:{ family:'IBM Plex Mono', size:11 } } },
+        y: { grid:{ display:false }, ticks:{ color:'#181F16', font:{ family:'Inter', size:12 } } }
+      }
+    }
+  });
+}
+
+setupDropzone('drop-uw', 'file-uw', function(file){
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var cases = JSON.parse(e.target.result);
+      renderUW(cases);
+    }catch(err){
+      document.getElementById('uw-results').innerHTML = '<p class="empty-hint">Could not parse that JSON file.</p>';
+    }
+  };
+  reader.readAsText(file);
+});
+
+function kv(obj){
+  if(!obj) return '';
+  var rows = '';
+  Object.keys(obj).forEach(function(k){
+    if(k === 'notes') return;
+    var v = obj[k];
+    if(Array.isArray(v)) v = v.join('; ');
+    rows += '<div class="kv-row"><span>' + k + '</span><span>' + v + '</span></div>';
+  });
+  if(obj.notes) rows += '<div style="margin-top:6px;color:var(--ink-faint);font-size:11.5px;line-height:1.5;">' + obj.notes + '</div>';
+  return rows;
+}
+
+function renderUW(cases){
+  var el = document.getElementById('uw-results');
+  if(!Array.isArray(cases) || !cases.length){ el.innerHTML = '<p class="empty-hint">No cases found in that file.</p>'; return; }
+
+  var html = '';
+  cases.forEach(function(c){
+    var decision = c.decision || {};
+    var fraud = c.fraud || {};
+    var sc = stampClass(decision.recommendation);
+    var fraudFlag = fraud.fraud_flag === true || fraud.fraud_flag === 'true';
+
+    html += '<div class="case-card">';
+    html += '<div class="case-head">'
+      + '<div><div class="case-id">' + (c.case_id || decision.case_id || '-') + '</div>'
+      + '<span class="stamp ' + sc + '">' + (decision.recommendation || '-') + '</span></div>'
+      + '<div><div class="risk-score">' + (decision.risk_score !== undefined ? decision.risk_score : '-') + '</div>'
+      + '<div class="risk-label">Risk score</div></div>'
+      + '</div>';
+
+    if(fraudFlag){
+      html += '<div class="fraud-banner"><b>Fraud Detection Agent flagged this case</b>'
+        + (fraud.severity ? ' — severity: ' + fraud.severity : '')
+        + (fraud.flagged_reasons ? '. Reasons: ' + (Array.isArray(fraud.flagged_reasons) ? fraud.flagged_reasons.join('; ') : fraud.flagged_reasons) : '')
+        + '</div>';
+    }
+
+    html += '<div class="agent-grid">'
+      + '<div class="agent-block"><div class="at">KYC verification</div><div class="av">' + kv(c.kyc) + '</div></div>'
+      + '<div class="agent-block"><div class="at">Income verification</div><div class="av">' + kv(c.income) + '</div></div>'
+      + '<div class="agent-block"><div class="at">Medical assessment</div><div class="av">' + kv(c.medical) + '</div></div>'
+      + '<div class="agent-block"><div class="at">Fraud detection</div><div class="av">' + kv(c.fraud) + '</div></div>'
+      + '</div>';
+
+    if(decision.justification){
+      html += '<div class="justification">"' + decision.justification + '"</div>';
+    }
+
+    html += '</div>';
+  });
+
+  el.innerHTML = html;
+}
+</script>
+</body>
+</html>
